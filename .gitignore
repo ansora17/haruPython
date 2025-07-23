@@ -1,0 +1,35 @@
+# Created by venv; see https://docs.python.org/3/library/venv.html
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.log
+*.sqlite3
+*.db
+
+# Environment
+.env
+venv/
+env/
+.env.*
+
+# VSCode or other editor folders
+.vscode/
+.idea/
+
+# OS-specific
+.DS_Store
+Thumbs.db
+
+# Python virtual environment files
+Scripts/
+Lib/
+Include/
+pyvenv.cfg
+share/
+
+# Large data files
+data/*.csv
+data/*.txt
+!data/exercise_dataset.csv
+# Keep small files like food01.png

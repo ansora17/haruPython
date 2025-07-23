@@ -1,0 +1,16 @@
+fastapi
+uvicorn
+langchain
+langchain-community
+openai
+python-dotenv
+faiss-cpu
+pandas
+PyPDF2
+python-multipart
+pydantic
+httpx
+beautifulsoup4
+supabase
+lxml
+Pillow 
