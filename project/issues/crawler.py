@@ -3,10 +3,10 @@ from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 import os
 
-from app.utils.chunk_utils import chunk_text
-from app.utils.openai_utils import summarize_text
-from app.supabase_client import supabase
-from db import save_summary_to_db
+from .app.utils.chunk_utils import chunk_text
+from .app.utils.openai_utils import summarize_text
+from .app.supabase_client import supabase
+from .db import save_summary_to_db
 
 # 프로젝트 루트의 .env 파일 로드
 from pathlib import Path

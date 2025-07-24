@@ -1,4 +1,4 @@
-from app.supabase_client import supabase
+from .app.supabase_client import supabase
 
 def is_duplicate(url: str) -> bool:
     try:
