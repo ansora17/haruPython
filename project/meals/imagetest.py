@@ -3,11 +3,11 @@ from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 import base64, os, openai
 from PIL import Image
-import io
+import itertools
 from dotenv import load_dotenv
 
 load_dotenv()
-api_key = os.getenv("OPENAI_API_KEY")
+api_key = os.getenv("OpenAI_API_KEY")
 client = openai.OpenAI(api_key=api_key)
 
 app = FastAPI()
