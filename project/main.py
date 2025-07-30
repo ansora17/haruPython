@@ -636,29 +636,26 @@ async def analyze_food_image(file: UploadFile = File(...)):
 You are a food image analysis expert with deep knowledge in culinary arts. 
 If there are more than two food photos, please add the two values together. 
 Please analyze the food image provided below carefully, considering its appearance, ingredients, and regional characteristics.  
-Provide the following information:
 
-- Dish name
-- exact calories (in kcal)
-- carbohydrates in the food(grams)
-- protein in the food(grams)
-- fat in the food(grams)
-- Sodium in this food(grams)
-- Dietary fiber in that food(grams)
-- Number of foods and total amount (grams)
+Please provide the analysis in JSON format with the following structure:
+{
+    "foodName": "음식 이름",
+    "calories": 숫자값,
+    "carbohydrates": 숫자값,
+    "protein": 숫자값,
+    "fat": 숫자값,
+    "sodium": 숫자값,
+    "fiber": 숫자값,
+    "dietary_fiber": 숫자값,
+    "total_amount": 숫자값,
+    "food_category": "한식/중식/일식/양식/분식/음료 중 하나"
+}
 
-⚠ IMPORTANT: Your response must be written in Korean at the end
-
-Format your response exactly like this:
-
-- 요리명: (dish name in Korean)
-- 칼로리: (exact calories in kcal)
-- 탄수화물: (carbohydrates in the food(grams))
-- 단백질: (protein in the food(grams))
-- 지방: (fat in the food(grams))
-- 나트륨: (Sodium in this food(grams))
-- 식이섬유: (Dietary fiber in that food(grams))
-- 총량: (Number of foods and total amount (grams))
+⚠ IMPORTANT: 
+1. Return ONLY valid JSON format
+2. All numeric values should be numbers (not strings)
+3. All text values should be in Korean
+4. Do not include any additional text or explanations
 """
                     },
                     {
@@ -678,14 +675,50 @@ Format your response exactly like this:
             max_tokens=300
         )
         
-        return {
-            "result": response.choices[0].message.content,
-            "type": "image_analysis",
-            "model": "gpt-4-turbo"
-        }
+        # JSON 응답 파싱
+        import json
+        try:
+            result_json = json.loads(response.choices[0].message.content)
+            return {
+                "success": True,
+                "result": result_json,  # React 코드와 호환되도록 "result" 키 사용
+                "type": "image_analysis",
+                "model": "gpt-4-turbo"
+            }
+        except json.JSONDecodeError:
+            # JSON 파싱 실패 시 원본 텍스트 반환
+            return {
+                "success": False,
+                "error": "JSON 파싱 실패",
+                "result": response.choices[0].message.content,  # React 코드와 호환되도록 "result" 키 사용
+                "type": "image_analysis",
+                "model": "gpt-4-turbo"
+            }
         
     except Exception as e:
         return {"error": f"이미지 분석 중 오류가 발생했습니다: {str(e)}"}
+
+@app.get("/api/food/analyze")
+async def get_food_analyze_info():
+    """음식 분석 API 정보 제공 (GET 요청용)"""
+    return {
+        "message": "음식 이미지 분석 API",
+        "method": "POST",
+        "description": "음식 이미지를 업로드하여 영양성분을 분석합니다.",
+        "usage": "POST /api/food/analyze with image file",
+        "supported_formats": ["jpg", "jpeg", "png", "gif"],
+        "response_format": {
+            "요리명": "음식 이름",
+            "칼로리": "칼로리 (kcal)",
+            "탄수화물": "탄수화물 (g)",
+            "단백질": "단백질 (g)",
+            "지방": "지방 (g)",
+            "나트륨": "나트륨 (g)",
+            "식이섬유": "식이섬유 (g)",
+            "총량": "총량 (g)",
+            "음식종류": "한식/중식/일식/양식/분식/음료"
+        }
+    }
 
 @app.get("/")
 def root():

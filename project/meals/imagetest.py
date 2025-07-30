@@ -38,30 +38,28 @@ async def analyze_food(file: UploadFile = File(...)):
 You are a food image analysis expert with deep knowledge in culinary arts. 
 If there are more than two food photos, please add the two values together. 
 Please analyze the food image provided below carefully, considering its appearance, ingredients, and regional characteristics.  
-Provide the following information:
 
-- Dish name
-- exact calories (in kcal)
-- carbohydrates in the food(grams)
-- protein in the food(grams)
-- fat in the food(grams)
-- Sodium in this food(grams)
-- Dietary fiber in that food(grams)
-- Number of foods and total amount (grams)
+Please provide the analysis in JSON format with the following structure:
+{
+    "foodName": "음식 이름",
+    "calories": 숫자값,
+    "carbohydrates": 숫자값,
+    "protein": 숫자값,
+    "fat": 숫자값,
+    "sodium": 숫자값,
+    "fiber": 숫자값,
+    "total_amount": 숫자값,
+    "food_category": "한식/중식/일식/양식/분식/음료 중 하나"
+}
 
-⚠ IMPORTANT: Your response must be written in Korean at the end
-
-Format your response exactly like this:
-
-- 요리명: (dish name in Korean)
-- 칼로리: (exact calories in kcal)
-- 탄수화물: (carbohydrates in the food(grams))
-- 단백질: (protein in the food(grams))
-- 지방: (fat in the food(grams))
-- 나트륨: (Sodium in this food(grams))
-- 식이섬유: (Dietary fiber in that food(grams))
-- 총량: (Number of foods and total amount (grams))
+⚠ IMPORTANT: 
+1. Return ONLY valid JSON format
+2. All numeric values should be numbers (not strings)
+3. All text values should be in Korean
+4. Do not include any additional text or explanations
+5. Make sure all quotes are properly escaped
 """
+
                 },
                 {
                     "type": "image_url",
@@ -77,8 +75,56 @@ Format your response exactly like this:
         response = client.chat.completions.create(
             model="gpt-4-turbo",
             messages=messages,
-            max_tokens=300
+            max_tokens=500,
+            temperature=0.1
         )
-        return {"result": response.choices[0].message.content}
+        
+        # JSON 응답 파싱
+        import json
+        import re
+        
+        content = response.choices[0].message.content.strip()
+        print(f"OpenAI 응답: {content}")  # 디버깅용
+        
+        # JSON 부분만 추출 (중괄호로 시작하고 끝나는 부분)
+        json_match = re.search(r'\{.*\}', content, re.DOTALL)
+        if json_match:
+            json_str = json_match.group()
+            try:
+                result_json = json.loads(json_str)
+                return {
+                    "success": True,
+                    "result": result_json,
+                    "type": "image_analysis",
+                    "model": "gpt-4-turbo"
+                }
+            except json.JSONDecodeError as e:
+                print(f"JSON 파싱 오류: {e}")
+                print(f"파싱 시도한 문자열: {json_str}")
+                return {
+                    "success": False,
+                    "error": f"JSON 파싱 실패: {str(e)}",
+                    "result": content,
+                    "type": "image_analysis",
+                    "model": "gpt-4-turbo"
+                }
+        else:
+            return {
+                "success": False,
+                "error": "JSON 형식을 찾을 수 없습니다",
+                "result": content,
+                "type": "image_analysis",
+                "model": "gpt-4-turbo"
+            }
     except Exception as e:
-        return {"error": str(e)}
+        print(f"OpenAI API 오류: {e}")
+        return {"error": f"이미지 분석 중 오류가 발생했습니다: {str(e)}"}
+
+# 테스트용 엔드포인트
+@app.get("/test")
+async def test_endpoint():
+    return {
+        "message": "이미지 분석 서버가 정상 작동 중입니다",
+        "endpoint": "/api/food/analyze",
+        "method": "POST"
+    }
