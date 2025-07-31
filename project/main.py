@@ -616,15 +616,62 @@ async def crawl(url: str):
 # 🍽️ 이미지 기반 음식 분석 기능
 def encode_image(file: UploadFile):
     """이미지 파일을 base64로 인코딩"""
-    file.file.seek(0)  # 파일 포인터를 시작으로 이동
-    content = file.file.read()
-    return base64.b64encode(content).decode("utf-8")
+    try:
+        # 파일 포인터를 시작으로 이동
+        file.file.seek(0)
+        content = file.file.read()
+        
+        # 파일이 비어있는지 확인
+        if not content:
+            raise ValueError("업로드된 파일이 비어있습니다")
+        
+        # 파일 크기 확인 (너무 큰 파일 방지)
+        if len(content) > 10 * 1024 * 1024:  # 10MB 제한
+            raise ValueError("파일 크기가 너무 큽니다 (최대 10MB)")
+        
+        # base64 인코딩
+        encoded = base64.b64encode(content).decode("utf-8")
+        
+        # 인코딩된 문자열이 유효한지 확인
+        if not encoded:
+            raise ValueError("이미지 인코딩에 실패했습니다")
+        
+        return encoded
+    except Exception as e:
+        print(f"이미지 인코딩 오류: {e}")
+        raise ValueError(f"이미지 인코딩 중 오류가 발생했습니다: {str(e)}")
 
 @app.post("/api/food/analyze")
 async def analyze_food_image(file: UploadFile = File(...)):
     """음식 이미지를 분석하여 영양성분 정보 제공"""
     try:
-        encoded = encode_image(file)
+        # 파일 형식 검증
+        if not file.content_type or not file.content_type.startswith('image/'):
+            return {
+                "success": False,
+                "error": "이미지 파일만 업로드 가능합니다",
+                "type": "image_analysis"
+            }
+        
+        # 파일 확장자 검증
+        allowed_extensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp']
+        file_extension = os.path.splitext(file.filename)[1].lower()
+        if file_extension not in allowed_extensions:
+            return {
+                "success": False,
+                "error": f"지원하지 않는 파일 형식입니다. 지원 형식: {', '.join(allowed_extensions)}",
+                "type": "image_analysis"
+            }
+        
+        # 이미지 인코딩
+        try:
+            encoded = encode_image(file)
+        except ValueError as e:
+            return {
+                "success": False,
+                "error": str(e),
+                "type": "image_analysis"
+            }
         
         messages = [
             {
@@ -703,7 +750,7 @@ For multiple foods (2 or more):
                     {
                         "type": "image_url",
                         "image_url": {
-                            "url": f"data:image/png;base64,{encoded}"
+                            "url": f"data:{file.content_type};base64,{encoded}"
                         }
                     }
                 ]
@@ -757,7 +804,103 @@ For multiple foods (2 or more):
         }
         
     except Exception as e:
-        return {"error": f"이미지 분석 중 오류가 발생했습니다: {str(e)}"}
+        print(f"이미지 분석 중 오류: {e}")
+        return {
+            "success": False,
+            "error": f"이미지 분석 중 오류가 발생했습니다: {str(e)}",
+            "type": "image_analysis"
+        }
+
+# 텍스트 기반 음식 분석 엔드포인트
+@app.post("/api/food/analyze/text")
+async def analyze_food_text(request: dict):
+    """텍스트로 음식 분석 요청"""
+    try:
+        food_text = request.get("food_name", "")
+        if not food_text:
+            return {"error": "음식 이름을 입력해주세요"}
+        
+        messages = [
+            {
+                "role": "user",
+                "content": f"""
+You are a food image analysis expert with deep knowledge in culinary arts. 
+Please analyze the food described below and provide nutritional information.
+
+Food: {food_text}
+
+Please provide the analysis in JSON format with the following structure:
+
+{{
+    "foodName": "음식 이름",
+    "calories": 숫자값,
+    "carbohydrates": 숫자값,
+    "protein": 숫자값,
+    "fat": 숫자값,
+    "sodium": 숫자값,
+    "fiber": 숫자값,
+    "total_amount": 숫자값,
+    "food_category": "한식/중식/일식/양식/분식/음료 중 하나"
+}}
+
+⚠ IMPORTANT: 
+1. Return ONLY valid JSON format
+2. All numeric values should be numbers (not strings)
+3. All text values should be in Korean
+4. Do not include any additional text or explanations
+5. Make sure all quotes are properly escaped
+"""
+            }
+        ]
+
+        client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        response = client.chat.completions.create(
+            model="gpt-4-turbo",
+            messages=messages,
+            max_tokens=300,
+            temperature=0.1
+        )
+        
+        # JSON 응답 파싱
+        import json
+        import re
+        
+        content = response.choices[0].message.content.strip()
+        print(f"OpenAI 응답: {content}")  # 디버깅용
+        
+        # JSON 부분만 추출
+        json_match = re.search(r'\{.*\}', content, re.DOTALL)
+        if json_match:
+            json_str = json_match.group()
+            try:
+                result_json = json.loads(json_str)
+                return {
+                    "success": True,
+                    "result": result_json,  # React 코드와 호환되도록 "result" 키 사용
+                    "type": "text_analysis",
+                    "model": "gpt-4-turbo"
+                }
+            except json.JSONDecodeError as e:
+                print(f"JSON 파싱 오류: {e}")
+                print(f"파싱 시도한 문자열: {json_str}")
+                return {
+                    "success": False,
+                    "error": f"JSON 파싱 실패: {str(e)}",
+                    "result": content,  # React 코드와 호환되도록 "result" 키 사용
+                    "type": "text_analysis",
+                    "model": "gpt-4-turbo"
+                }
+        else:
+            return {
+                "success": False,
+                "error": "JSON 형식을 찾을 수 없습니다",
+                "result": content,  # React 코드와 호환되도록 "result" 키 사용
+                "type": "text_analysis",
+                "model": "gpt-4-turbo"
+            }
+    except Exception as e:
+        print(f"OpenAI API 오류: {e}")
+        return {"error": f"텍스트 분석 중 오류가 발생했습니다: {str(e)}"}
 
 @app.get("/api/food/analyze")
 async def get_food_analyze_info():
