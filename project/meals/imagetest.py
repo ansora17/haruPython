@@ -36,21 +36,61 @@ async def analyze_food(file: UploadFile = File(...)):
                     "type": "text",
                     "text": """
 You are a food image analysis expert with deep knowledge in culinary arts. 
-If there are more than two food photos, please add the two values together. 
 Please analyze the food image provided below carefully, considering its appearance, ingredients, and regional characteristics.  
 
+IMPORTANT: Analyze ALL foods visible in the image, no matter how many there are. Each food should be a separate object in the array.
+
 Please provide the analysis in JSON format with the following structure:
+
+For single food:
 {
     "foodName": "음식 이름",
     "calories": 숫자값,
-    "carbohydrates": 숫자값,
+    "carbohydrate": 숫자값,
     "protein": 숫자값,
     "fat": 숫자값,
     "sodium": 숫자값,
     "fiber": 숫자값,
-    "total_amount": 숫자값,
-    "food_category": "한식/중식/일식/양식/분식/음료 중 하나"
+    "totalAmount": 숫자값,
+    "foodCategory": "한식/중식/일식/양식/분식/음료 중 하나"
 }
+
+For multiple foods (2 or more):
+[
+    {
+        "foodName": "음식 이름 1",
+        "calories": 숫자값,
+        "carbohydrate": 숫자값,
+        "protein": 숫자값,
+        "fat": 숫자값,
+        "sodium": 숫자값,
+        "fiber": 숫자값,
+        "totalAmount": 숫자값,
+        "foodCategory": "한식/중식/일식/양식/분식/음료 중 하나"
+    },
+    {
+        "foodName": "음식 이름 2",
+        "calories": 숫자값,
+        "carbohydrate": 숫자값,
+        "protein": 숫자값,
+        "fat": 숫자값,
+        "sodium": 숫자값,
+        "fiber": 숫자값,
+        "totalAmount": 숫자값,
+        "foodCategory": "한식/중식/일식/양식/분식/음료 중 하나"
+    },
+    {
+        "foodName": "음식 이름 3",
+        "calories": 숫자값,
+        "carbohydrate": 숫자값,
+        "protein": 숫자값,
+        "fat": 숫자값,
+        "sodium": 숫자값,
+        "fiber": 숫자값,
+        "totalAmount": 숫자값,
+        "foodCategory": "한식/중식/일식/양식/분식/음료 중 하나"
+    }
+]
 
 ⚠ IMPORTANT: 
 1. Return ONLY valid JSON format
@@ -58,6 +98,9 @@ Please provide the analysis in JSON format with the following structure:
 3. All text values should be in Korean
 4. Do not include any additional text or explanations
 5. Make sure all quotes are properly escaped
+6. If there's only one food, return a single object. If there are multiple foods, return an array of objects.
+7. Include ALL foods visible in the image, even if there are many
+8. Each food should be analyzed separately with its own nutritional values
 """
 
                 },
@@ -86,36 +129,37 @@ Please provide the analysis in JSON format with the following structure:
         content = response.choices[0].message.content.strip()
         print(f"OpenAI 응답: {content}")  # 디버깅용
         
-        # JSON 부분만 추출 (중괄호로 시작하고 끝나는 부분)
-        json_match = re.search(r'\{.*\}', content, re.DOTALL)
-        if json_match:
-            json_str = json_match.group()
-            try:
-                result_json = json.loads(json_str)
-                return {
-                    "success": True,
-                    "result": result_json,
-                    "type": "image_analysis",
-                    "model": "gpt-4-turbo"
-                }
-            except json.JSONDecodeError as e:
-                print(f"JSON 파싱 오류: {e}")
-                print(f"파싱 시도한 문자열: {json_str}")
-                return {
-                    "success": False,
-                    "error": f"JSON 파싱 실패: {str(e)}",
-                    "result": content,
-                    "type": "image_analysis",
-                    "model": "gpt-4-turbo"
-                }
-        else:
-            return {
-                "success": False,
-                "error": "JSON 형식을 찾을 수 없습니다",
-                "result": content,
-                "type": "image_analysis",
-                "model": "gpt-4-turbo"
-            }
+        # 배열과 객체 모두 처리할 수 있도록 개선
+        json_patterns = [
+            r'\[.*\]',  # 배열 패턴
+            r'\{.*\}',  # 객체 패턴
+        ]
+        
+        for pattern in json_patterns:
+            json_match = re.search(pattern, content, re.DOTALL)
+            if json_match:
+                json_str = json_match.group()
+                try:
+                    result_json = json.loads(json_str)
+                    return {
+                        "success": True,
+                        "result": result_json,
+                        "type": "image_analysis",
+                        "model": "gpt-4-turbo"
+                    }
+                except json.JSONDecodeError as e:
+                    print(f"JSON 파싱 오류: {e}")
+                    print(f"파싱 시도한 문자열: {json_str}")
+                    continue
+        
+        # 모든 패턴이 실패한 경우
+        return {
+            "success": False,
+            "error": "JSON 형식을 찾을 수 없습니다",
+            "result": content,
+            "type": "image_analysis",
+            "model": "gpt-4-turbo"
+        }
     except Exception as e:
         print(f"OpenAI API 오류: {e}")
         return {"error": f"이미지 분석 중 오류가 발생했습니다: {str(e)}"}
