@@ -1,10 +1,11 @@
 # uvicorn imagetest:app --reload --host 0.0.0.0 --port 8000
-from fastapi import FastAPI, UploadFile, File
+from fastapi import FastAPI, UploadFile, File, Request
 from fastapi.middleware.cors import CORSMiddleware
 import base64, os, openai
 from PIL import Image
 import itertools
 from dotenv import load_dotenv
+import json
 
 load_dotenv()
 api_key = os.getenv("OpenAI_API_KEY")
@@ -19,6 +20,17 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.middleware("http")
+async def json_error_handler(request: Request, call_next):
+    try:
+        response = await call_next(request)
+        return response
+    except Exception as e:
+        if "Invalid control character" in str(e):
+            print(f"JSON 파싱 오류: {e}")
+            # 안전한 기본 응답
+        raise e
 
 def encode_image(file: UploadFile):
     """이미지 파일을 base64로 인코딩"""
@@ -167,7 +179,6 @@ For multiple foods (2 or more):
         )
         
         # JSON 응답 파싱
-        import json
         import re
         
         content = response.choices[0].message.content.strip()
@@ -295,7 +306,6 @@ For multiple foods (if the text describes multiple foods):
         )
         
         # JSON 응답 파싱
-        import json
         import re
         
         content = response.choices[0].message.content.strip()
