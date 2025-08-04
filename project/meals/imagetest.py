@@ -1,12 +1,10 @@
 # uvicorn imagetest:app --reload --host 0.0.0.0 --port 8000
 from fastapi import APIRouter, UploadFile, File
-import base64, os, openai
-from PIL import Image
-import itertools
+import base64, os, openai, json, re
 from dotenv import load_dotenv
 
 load_dotenv()
-api_key = os.getenv("OpenAI_API_KEY")
+api_key = os.getenv("OPENAI_API_KEY")
 client = openai.OpenAI(api_key=api_key)
 
 # 라우터 생성
@@ -159,9 +157,6 @@ For multiple foods (2 or more):
         )
         
         # JSON 응답 파싱
-        import json
-        import re
-        
         content = response.choices[0].message.content.strip()
         print(f"OpenAI 응답: {content}")
         
@@ -279,8 +274,7 @@ For multiple foods (if the text describes multiple foods):
 6. If there's only one food, return a single object. If there are multiple foods, return an array of objects.
 7. Analyze ALL foods mentioned in the text, even if there are many
 8. Each food should be analyzed separately with its own nutritional values
-# 7. If the same food appears multiple times, combine them into one entry and multiply the nutritional values by the number of items
-# 8. Each unique food should be analyzed separately with its own nutritional values
+"""
             }
         ]
 
@@ -292,9 +286,6 @@ For multiple foods (if the text describes multiple foods):
         )
         
         # JSON 응답 파싱
-        import json
-        import re
-        
         content = response.choices[0].message.content.strip()
         print(f"OpenAI 응답: {content}")
         
