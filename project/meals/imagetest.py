@@ -1,6 +1,5 @@
 # uvicorn imagetest:app --reload --host 0.0.0.0 --port 8000
-from fastapi import FastAPI, UploadFile, File
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi import APIRouter, UploadFile, File
 import base64, os, openai
 from PIL import Image
 import itertools
@@ -10,15 +9,8 @@ load_dotenv()
 api_key = os.getenv("OpenAI_API_KEY")
 client = openai.OpenAI(api_key=api_key)
 
-app = FastAPI()
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# 라우터 생성
+router = APIRouter(prefix="/api/food", tags=["food_analysis"])
 
 def encode_image(file: UploadFile):
     """이미지 파일을 base64로 인코딩"""
@@ -47,7 +39,7 @@ def encode_image(file: UploadFile):
         print(f"이미지 인코딩 오류: {e}")
         raise ValueError(f"이미지 인코딩 중 오류가 발생했습니다: {str(e)}")
 
-@app.post("/api/food/analyze")
+@router.post("/analyze")
 async def analyze_food(file: UploadFile = File(...)):
     """음식 이미지를 분석하여 영양성분 정보 제공"""
     try:
@@ -213,13 +205,17 @@ For multiple foods (2 or more):
         }
 
 # 텍스트 기반 음식 분석 엔드포인트
-@app.post("/api/food/analyze/text")
+@router.post("/analyze/text")
 async def analyze_food_text(request: dict):
     """텍스트로 음식 분석 요청"""
     try:
         food_text = request.get("food_name", "")
         if not food_text:
-            return {"error": "음식 이름을 입력해주세요"}
+            return {
+                "success": False,
+                "error": "음식 이름을 입력해주세요",
+                "type": "text_analysis"
+            }
         
         messages = [
             {
@@ -281,16 +277,17 @@ For multiple foods (if the text describes multiple foods):
 4. Do not include any additional text or explanations
 5. Make sure all quotes are properly escaped
 6. If there's only one food, return a single object. If there are multiple foods, return an array of objects.
-7. If the same food appears multiple times, combine them into one entry and multiply the nutritional values by the number of items
-8. Each unique food should be analyzed separately with its own nutritional values
-"""
+7. Analyze ALL foods mentioned in the text, even if there are many
+8. Each food should be analyzed separately with its own nutritional values
+# 7. If the same food appears multiple times, combine them into one entry and multiply the nutritional values by the number of items
+# 8. Each unique food should be analyzed separately with its own nutritional values
             }
         ]
 
         response = client.chat.completions.create(
             model="gpt-4-turbo",
             messages=messages,
-            max_tokens=300,
+            max_tokens=500,
             temperature=0.1
         )
         
@@ -341,7 +338,7 @@ For multiple foods (if the text describes multiple foods):
         }
 
 # 테스트용 엔드포인트
-@app.get("/test")
+@router.get("/test")
 async def test_endpoint():
     return {
         "message": "이미지 분석 서버가 정상 작동 중입니다",
